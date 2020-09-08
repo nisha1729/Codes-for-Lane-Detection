@@ -1,9 +1,15 @@
 Tensorflow version of SCNN in CULane.
 
+## Requirements
+    Python 3.7
+    Tensorflow 1.15.0
+    Protobuf
+    (Refer requriements.txt for more)
+
 ## Installation
-    conda create -n tensorflow_gpu pip python=3.5
+    conda create -n tensorflow_gpu pip python=3.7
     source activate tensorflow_gpu
-    pip install --upgrade tensorflow-gpu==1.3.0
+    conda install --upgrade tensorflow-gpu==1.15.0
     pip3 install -r lane-detection-model/requirements.txt 
 
 ## Download VGG-16 
