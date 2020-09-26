@@ -234,7 +234,8 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
             if net_flag == 'vgg' and weights_path is None:
                 pretrained_weights = np.load(
                     './data/vgg16.npy',
-                    encoding='latin1').item()
+                    encoding='latin1', allow_pickle=True).item()
+                print("loaded")
 
                 for vv in tf.trainable_variables():
                     weights = vv.name.split('/')
@@ -248,6 +249,7 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
                             continue
         tf.train.start_queue_runners(sess=sess)
         for epoch in range(CFG.TRAIN.EPOCHS):
+            print("epoch")
             t_start = time.time()
 
             _, c, train_accuracy, train_accuracy_back, train_instance_loss, train_existence_loss, _ = \
@@ -260,8 +262,10 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
             train_existence_loss_mean.append(train_existence_loss)
             train_accuracy_mean.append(train_accuracy)
             train_accuracy_back_mean.append(train_accuracy_back)
+            print('checkpoint 1')
 
-            if epoch % CFG.TRAIN.DISPLAY_STEP == 0:
+            # if epoch % CFG.TRAIN.DISPLAY_STEP == 0:
+            if epoch:
                 print(
                     'Epoch: {:d} loss_ins= {:6f} ({:6f}) loss_ext= {:6f} ({:6f}) accuracy= {:6f} ({:6f}) '
                     'accuracy_back= {:6f} ({:6f}) mean_time= {:5f}s '.format(epoch + 1, train_instance_loss,
@@ -274,18 +278,21 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
                                                                              np.mean(train_accuracy_back_mean),
                                                                              np.mean(train_cost_time_mean)))
 
-            if epoch % 500 == 0:
+            # if epoch % 500 == 0:
+            if epoch:
                 train_cost_time_mean.clear()
                 train_instance_loss_mean.clear()
                 train_existence_loss_mean.clear()
                 train_accuracy_mean.clear()
                 train_accuracy_back_mean.clear()
 
-            if epoch % 1000 == 0:
+            print('checkpoint 2')
+            # if epoch % 1000 == 0:
+            if epoch:
                 saver.save(sess=sess, save_path=model_save_path, global_step=epoch)
 
-            if epoch % 10000 != 0 or epoch == 0:
-                continue
+            # if epoch % 10000 != 0 or epoch == 0: # Comment this to run code for 1 epoch
+            #     continue
 
             val_cost_time_mean = []
             val_instance_loss_mean = []
@@ -293,6 +300,8 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
             val_accuracy_mean = []
             val_accuracy_back_mean = []
             val_IoU_mean = []
+
+            print('checkpoint 3')
 
             for epoch_val in range(int(len(val_dataset) / CFG.TRAIN.VAL_BATCH_SIZE / CFG.TRAIN.GPU_NUM)):
                 t_start_val = time.time()
@@ -319,12 +328,15 @@ def train_net(dataset_dir, weights_path=None, net_flag='vgg'):
                                  val_accuracy_back, np.mean(val_accuracy_back_mean), val_IoU, np.mean(val_IoU_mean),
                                  np.mean(val_cost_time_mean)))
 
+            print('checkpoint 4')
             val_cost_time_mean.clear()
             val_instance_loss_mean.clear()
             val_existence_loss_mean.clear()
             val_accuracy_mean.clear()
             val_accuracy_back_mean.clear()
             val_IoU_mean.clear()
+
+            print('checkpoint 5')
 
 
 if __name__ == '__main__':
@@ -333,3 +345,7 @@ if __name__ == '__main__':
 
     # train lanenet
     train_net(args.dataset_dir, args.weights_path, net_flag=args.net)
+
+    # TODO: Check train_gt.txt for exist (needs to be zero for one image)
+
+    # TODO: queue handling - curently epoch val is 0 since only 1 epoch is being run

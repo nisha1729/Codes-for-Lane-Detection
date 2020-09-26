@@ -19,11 +19,11 @@ cfg = __C
 __C.TRAIN = edict()
 
 # Set the shadownet training epochs
-__C.TRAIN.EPOCHS = 90100  # 200010
+__C.TRAIN.EPOCHS = 1 #90100  # 200010
 # Set the display step
 __C.TRAIN.DISPLAY_STEP = 1
 # Set the test display step during training process
-__C.TRAIN.TEST_DISPLAY_STEP = 1000
+__C.TRAIN.TEST_DISPLAY_STEP = 1 # changed from 1000
 # Set the momentum parameter of the optimizer
 __C.TRAIN.MOMENTUM = 0.9
 # Set the initial learning rate
@@ -33,9 +33,9 @@ __C.TRAIN.GPU_MEMORY_FRACTION = 0.85
 # Set the GPU allow growth parameter during tensorflow training process
 __C.TRAIN.TF_ALLOW_GROWTH = True
 # Set the shadownet training batch size
-__C.TRAIN.BATCH_SIZE = 8  # 4
+__C.TRAIN.BATCH_SIZE = 1 # changed from 8  # 4
 # Set the shadownet validation batch size
-__C.TRAIN.VAL_BATCH_SIZE = 8  # 4
+__C.TRAIN.VAL_BATCH_SIZE = 1 # changed from 8  # 4
 # Set the learning rate decay steps
 __C.TRAIN.LR_DECAY_STEPS = 210000
 # Set the learning rate decay rate
@@ -47,9 +47,9 @@ __C.TRAIN.IMG_HEIGHT = 288  # 256
 # Set the image width
 __C.TRAIN.IMG_WIDTH = 800  # 512
 # Set GPU number
-__C.TRAIN.GPU_NUM = 4   # 8
+__C.TRAIN.GPU_NUM = 1 # changed from 4   # 8
 # Set CPU thread number
-__C.TRAIN.CPU_NUM = 4   #
+__C.TRAIN.CPU_NUM = 1 # changed from 4   # TODO: Try changing this to allow fewer train samples
 
 # Test options
 __C.TEST = edict()
@@ -59,6 +59,14 @@ __C.TEST.GPU_MEMORY_FRACTION = 0.8
 # Set the GPU allow growth parameter during tensorflow testing process
 __C.TEST.TF_ALLOW_GROWTH = True
 # Set the test batch size
-__C.TEST.BATCH_SIZE = 8
+__C.TEST.BATCH_SIZE = 1 #changed from 8
 # Set the test CPU thread number
-__C.TEST.CPU_NUM = 8
+__C.TEST.CPU_NUM = 1 # changed from 8
+
+# For data augmentation
+
+# Set the image height
+__C.TRAIN.AUG_IMG_HEIGHT = 400  # 256
+# Set the image width
+__C.TRAIN.AUG_IMG_WIDTH = 600  # 512
+#

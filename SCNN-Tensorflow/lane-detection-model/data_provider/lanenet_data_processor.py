@@ -9,6 +9,9 @@
 实现LaneNet的数据解析类
 """
 import tensorflow as tf
+import sys
+import numpy as np
+from matplotlib import pyplot as plt
 
 from config import global_config
 
@@ -36,8 +39,10 @@ class DataSet(object):
     def process_img(img_queue):
         img_raw = tf.read_file(img_queue)
         img_decoded = tf.image.decode_jpeg(img_raw, channels=3)
-        img_resized = tf.image.resize_images(img_decoded, [CFG.TRAIN.IMG_HEIGHT, CFG.TRAIN.IMG_WIDTH],
-                                             method=tf.image.ResizeMethod.BICUBIC)
+        img_decoded_ = tf.expand_dims(img_decoded, 0)   # crop_and_resize needs 4D tensor
+        img_crop_resize = tf.image.crop_and_resize(img_decoded_, [[0, 0.2, 1, 0.75]], crop_size=[400, 600], box_ind=[0])
+        img_resized = tf.image.resize_images(img_crop_resize[0,], [CFG.TRAIN.IMG_HEIGHT, CFG.TRAIN.IMG_WIDTH],
+                                             method=tf.image.ResizeMethod.BICUBIC) # convert 4D back to 3D for resize_images
         img_casted = tf.cast(img_resized, tf.float32)
         return tf.subtract(img_casted, VGG_MEAN)
 
@@ -69,7 +74,7 @@ class DataSet(object):
         with open(self.dataset_info_file, 'r') as file:
             for _info in file:
                 info_tmp = _info.strip(' ').split()
-
+                # print("Taking images from: ", info_tmp[0][1:])
                 img_list.append(info_tmp[0][1:])
                 label_instance_list.append(info_tmp[1][1:])
                 label_existence_list.append([int(info_tmp[2]), int(info_tmp[3]), int(info_tmp[4]), int(info_tmp[5])])
@@ -82,6 +87,8 @@ class DataSet(object):
             label_instance_tensor = tf.convert_to_tensor(label_instance_list)
             label_existence_tensor = tf.convert_to_tensor(label_existence_list)
             input_queue = tf.train.slice_input_producer([image_tensor, label_instance_tensor, label_existence_tensor])
+            print("tf.print")
+            tf.print(input_queue[0], output_stream=sys.stdout)
             img = self.process_img(input_queue[0])
             label_instance = self.process_label_instance(input_queue[1])
             label_existence = self.process_label_existence(input_queue[2])

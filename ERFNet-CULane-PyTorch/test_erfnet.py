@@ -10,7 +10,7 @@ import cv2
 import utils.transforms as tf
 import numpy as np
 import models
-from models import sync_bn
+# from models import sync_bn
 import dataset as ds
 from options.options import parser
 import torch.nn.functional as F
@@ -21,6 +21,8 @@ best_mIoU = 0
 def main():
     global args, best_mIoU
     args = parser.parse_args()
+
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(str(gpu) for gpu in args.gpus)
     args.gpus = len(args.gpus)
@@ -46,12 +48,12 @@ def main():
     input_mean = model.input_mean
     input_std = model.input_std
     policies = model.get_optim_policies()
-    model = torch.nn.DataParallel(model, device_ids=range(args.gpus)).cuda()
+    model = torch.nn.DataParallel(model, device_ids=range(args.gpus)).to(DEVICE)
 
     if args.resume:
         if os.path.isfile(args.resume):
             print(("=> loading checkpoint '{}'".format(args.resume)))
-            checkpoint = torch.load(args.resume)
+            checkpoint = torch.load(args.resume, map_location=DEVICE) # for CPU only machines
             args.start_epoch = checkpoint['epoch']
             best_mIoU = checkpoint['best_mIoU']
             torch.nn.Module.load_state_dict(model, checkpoint['state_dict'])
@@ -74,8 +76,8 @@ def main():
     # define loss function (criterion) optimizer and evaluator
     weights = [1.0 for _ in range(5)]
     weights[0] = 0.4
-    class_weights = torch.FloatTensor(weights).cuda()
-    criterion = torch.nn.NLLLoss(ignore_index=ignore_label, weight=class_weights).cuda()
+    class_weights = torch.FloatTensor(weights).to(DEVICE)
+    criterion = torch.nn.NLLLoss(ignore_index=ignore_label, weight=class_weights).to(DEVICE)
     for group in policies:
         print(('group: {} has {} params, lr_mult: {}, decay_mult: {}'.format(group['name'], len(group['params']), group['lr_mult'], group['decay_mult'])))
     optimizer = torch.optim.SGD(policies, args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -97,41 +99,42 @@ def validate(val_loader, model, criterion, iter, evaluator, logger=None):
     model.eval()
 
     end = time.time()
-    for i, (input, target, img_name) in enumerate(val_loader):
+    with torch.no_grad():
+        for i, (input, target, img_name) in enumerate(val_loader):
 
-        input_var = torch.autograd.Variable(input, volatile=True)
+            input_var = torch.autograd.Variable(input)
 
-        # compute output
-        output, output_exist = model(input_var)
+            # compute output
+            output, output_exist = model(input_var)
 
-        # measure accuracy and record loss
+            # measure accuracy and record loss
 
-        output = F.softmax(output, dim=1)
+            output = F.softmax(output, dim=1)
 
-        pred = output.data.cpu().numpy() # BxCxHxW
-        pred_exist = output_exist.data.cpu().numpy() # BxO
+            pred = output.data.cpu().numpy() # BxCxHxW
+            pred_exist = output_exist.data.cpu().numpy() # BxO
 
-        for cnt in range(len(img_name)):
-            directory = 'predicts/vgg_SCNN_DULR_w9' + img_name[cnt][:-10]
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-            file_exist = open('predicts/vgg_SCNN_DULR_w9'+img_name[cnt].replace('.jpg', '.exist.txt'), 'w')
-            for num in range(4):
-                prob_map = (pred[cnt][num+1]*255).astype(int)
-                save_img = cv2.blur(prob_map,(9,9))
-                cv2.imwrite('predicts/vgg_SCNN_DULR_w9'+img_name[cnt].replace('.jpg', '_'+str(num+1)+'_avg.png'), save_img)
-                if pred_exist[cnt][num] > 0.5:
-                    file_exist.write('1 ')
-                else:
-                    file_exist.write('0 ')
-            file_exist.close()
+            for cnt in range(len(img_name)):
+                directory = 'predicts/vgg_SCNN_DULR_w9' + img_name[cnt][:-10]
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                file_exist = open('predicts/vgg_SCNN_DULR_w9'+img_name[cnt].replace('.JPG', '.exist.txt'), 'w') # TODO: generalise for jpg and JPG
+                for num in range(4):
+                    prob_map = (pred[cnt][num+1]*255).astype(int)
+                    save_img = cv2.blur(prob_map,(9,9))
+                    cv2.imwrite('predicts/vgg_SCNN_DULR_w9'+img_name[cnt].replace('.JPG', '_'+str(num+1)+'_avg.png'), save_img)
+                    if pred_exist[cnt][num] > 0.5:
+                        file_exist.write('1 ')
+                    else:
+                        file_exist.write('0 ')
+                file_exist.close()
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
 
-        if (i + 1) % args.print_freq == 0:
-            print(('Test: [{0}/{1}]\t' 'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(i, len(val_loader), batch_time=batch_time)))
+            if (i + 1) % args.print_freq == 0:
+                print(('Test: [{0}/{1}]\t' 'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(i, len(val_loader), batch_time=batch_time)))
 
     print('finished, #test:{}'.format(i) )
 
@@ -188,6 +191,69 @@ def adjust_learning_rate(optimizer, epoch, lr_steps):
         param_group['lr'] = lr * param_group['lr_mult']
         param_group['weight_decay'] = decay * param_group['decay_mult']
 
+def predict():
+    global args, best_mIoU
+    args = parser.parse_args()
+
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(str(gpu) for gpu in args.gpus)
+    args.gpus = len(args.gpus)
+
+    if args.dataset == 'VOCAug' or args.dataset == 'VOC2012' or args.dataset == 'COCO':
+        num_class = 21
+        ignore_label = 255
+        scale_series = [10, 20, 30, 60]
+    elif args.dataset == 'Cityscapes':
+        num_class = 19
+        ignore_label = 255
+        scale_series = [15, 30, 45, 90]
+    elif args.dataset == 'ApolloScape':
+        num_class = 37
+        ignore_label = 255
+    elif args.dataset == 'CULane':
+        num_class = 5
+        ignore_label = 255
+    else:
+        raise ValueError('Unknown dataset ' + args.dataset)
+
+    model = models.ERFNet(num_class)
+    input_mean = model.input_mean
+    input_std = model.input_std
+    policies = model.get_optim_policies()
+    model = torch.nn.DataParallel(model, device_ids=range(args.gpus)).to(DEVICE)
+
+    cudnn.benchmark = True
+    cudnn.fastest = True
+    # Data loading code
+
+    test_loader = torch.utils.data.DataLoader(
+        getattr(ds, args.dataset.replace("CULane", "VOCAug") + 'DataSetPredict')(data_list=args.val_list,
+                                transform=torchvision.transforms.Compose([tf.GroupRandomScaleNew(size=(args.img_width,
+                                args.img_height),interpolation=(cv2.INTER_LINEAR,cv2.INTER_NEAREST)),
+                                tf.GroupNormalize(mean=(input_mean, (0,)),std=(input_std, (1,))),])),
+                                batch_size=args.batch_size,shuffle=False, num_workers=args.workers, pin_memory=False)
+
+    # define loss function (criterion) optimizer and evaluator
+    weights = [1.0 for _ in range(5)]
+    weights[0] = 0.4
+    class_weights = torch.FloatTensor(weights).to(DEVICE)
+    criterion = torch.nn.NLLLoss(ignore_index=ignore_label, weight=class_weights).to(DEVICE)
+    for group in policies:
+        print(('group: {} has {} params, lr_mult: {}, decay_mult: {}'.format(group['name'], len(group['params']),
+                                                                             group['lr_mult'], group['decay_mult'])))
+    optimizer = torch.optim.SGD(policies, args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+    evaluator = EvalSegmentation(num_class, ignore_label)
+
+    ### evaluate ###
+    validate(test_loader, model, criterion, 0, evaluator)
+    return
+
+
+
+
 
 if __name__ == '__main__':
     main()
+
+    # For testing a single image

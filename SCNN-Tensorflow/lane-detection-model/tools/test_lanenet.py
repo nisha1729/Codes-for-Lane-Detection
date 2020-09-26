@@ -78,12 +78,10 @@ def test_lanenet(image_path, weights_path, use_gpu, image_list, batch_size, save
         sess.run(tf.global_variables_initializer())
         saver.restore(sess=sess, save_path=weights_path)
         for i in range(math.ceil(len(image_list) / batch_size)):
-            print(i)
             paths = test_dataset.next_batch()
             instance_seg_image, existence_output = sess.run([binary_seg_ret, instance_seg_ret],
                                                             feed_dict={input_tensor: paths})
             for cnt, image_name in enumerate(paths):
-                print(image_name)
                 parent_path = os.path.dirname(image_name)
                 directory = os.path.join(save_dir, 'vgg_SCNN_DULR_w9', parent_path)
                 if not os.path.exists(directory):
@@ -109,9 +107,10 @@ if __name__ == '__main__':
         log.error('{:s} not exist and has been made'.format(args.save_dir))
         os.makedirs(args.save_dir)
 
-    save_dir = os.path.join(args.image_path, 'predicts')
+    save_dir = os.path.join(os.path.dirname(args.image_path), 'predicts')
     if args.save_dir is not None:
         save_dir = args.save_dir
+
 
     img_name = []
     with open(str(args.image_path), 'r') as g:
@@ -119,3 +118,5 @@ if __name__ == '__main__':
             img_name.append(line.strip())
 
     test_lanenet(args.image_path, args.weights_path, args.use_gpu, img_name, args.batch_size, save_dir)
+
+    print("Probability maps saved at: ", os.path.join(os.path.dirname(args.image_path), save_dir))

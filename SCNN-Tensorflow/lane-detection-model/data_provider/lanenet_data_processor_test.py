@@ -40,12 +40,15 @@ class DataSet(object):
         """
         img_list = []
 
+
+
         if not tf.gfile.Exists(self._dataset_info_file):
             raise ValueError('Failed to find file: ' + self._dataset_info_file)
 
         with open(self._dataset_info_file, 'r') as file:
             for _info in file:
                 info_tmp = _info.strip(' ').split()
+                print("Taking images from: ", info_tmp[0][1:])
                 img_list.append(info_tmp[0][1:])
 
         self._len = len(img_list)
